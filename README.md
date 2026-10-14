@@ -146,7 +146,7 @@ mv /mnt/server0/data /mnt/server0/data1;
 
 vfs9_cli 是一个独立可运行的二进制程序，用于测试、实验 vfs9 行为或作为工具来读取 vfs9 的归档格式或单纯的用于解包 vfs9 支持的包类型文件。
 
-所有命令解析都基于 `boost::program_options` 实现，收入依赖 `cpp-linenoise` 库来处理输入文本。
+所有命令解析都基于 `boost::program_options` 实现，输入依赖 `cpp-linenoise` 库来处理输入文本。
 
 CLI启动命令参数：
 

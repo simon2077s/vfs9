@@ -19,6 +19,7 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -57,9 +58,9 @@ struct tree_builder {
     return *this;
   }
 
-  tree_builder& file(const std::filesystem::path& rel) {
+  tree_builder& file(const std::filesystem::path& rel, std::string_view content = "vfs9") {
     std::ofstream ofs(root / rel);
-    ofs << "vfs9";
+    ofs << content;
     return *this;
   }
 };
@@ -549,4 +550,472 @@ TEST_CASE_METHOD(vns_fixture, "vns clone is an independent standalone namespace"
   auto shadow_root = shadow_clone->get_info("/");
   REQUIRE(shadow_root.has_value());
   CHECK(shadow_root->fs.name == "localfs");
+}
+
+// ---------------------------------------------------------------------------
+// unmount overloads / union teardown
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns unmount by source path and edge cases", "[vns]") {
+  tree_builder base;
+  base.dir("src");
+  base.dir("dst");
+  REQUIRE(ns->mount("/", merge_flag::replace, true, localfs{ base.root }).has_value());
+
+  REQUIRE(ns->bind("/src", "/dst", merge_flag::replace, true).has_value());
+  CHECK(ns->get_info("/dst").value().fs.name == "localfs");
+
+  // unmount(new_path, old_path) removes the bind by its source path
+  auto removed = ns->unmount(std::filesystem::path("/src"), std::filesystem::path("/dst"));
+  REQUIRE(removed.has_value());
+  CHECK(*removed);
+  CHECK(ns->get_info("/dst").value().fs.name == "localfs"); // backed by base again
+
+  // An unknown name on an existing mount point is not an error, it just doesn't match
+  REQUIRE(ns->mount("/dst", merge_flag::replace, true, "m", localfs{ base.root }).has_value());
+  auto unknown = ns->unmount(std::string_view("nope"), std::filesystem::path("/dst"));
+  REQUIRE(unknown.has_value());
+  CHECK_FALSE(*unknown);
+
+  // A missing old_path is not a mount point
+  auto missing = ns->unmount(std::string_view("nope"), std::filesystem::path("/missing"));
+  REQUIRE(missing.has_value());
+  CHECK_FALSE(*missing);
+
+  // A relative old_path is rejected
+  auto relative = ns->unmount(std::string_view("nope"), std::filesystem::path("relative"));
+  REQUIRE_FALSE(relative.has_value());
+  CHECK(relative.error() == errc::not_an_abs_path);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns union shrinks one entry at a time", "[vns]") {
+  REQUIRE(ns->create_directory("/u").has_value());
+  tree_builder a;
+  a.file("fa");
+  tree_builder b;
+  b.file("fb");
+  tree_builder c;
+  c.file("fc");
+
+  REQUIRE(ns->mount("/u", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/u", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+  REQUIRE(ns->mount("/u", merge_flag::after, true, "c", localfs{ c.root }).has_value());
+  CHECK(ns->list("/u").value().size() == 3);
+
+  auto remove_c = ns->unmount(std::string_view("c"), std::filesystem::path("/u"));
+  REQUIRE(remove_c.has_value());
+  CHECK(*remove_c);
+  CHECK(ns->list("/u").value().size() == 2);
+  CHECK_FALSE(ns->exists("/u/fc").value());
+  CHECK(ns->exists("/u/fa").value());
+
+  auto remove_b = ns->unmount(std::string_view("b"), std::filesystem::path("/u"));
+  REQUIRE(remove_b.has_value());
+  CHECK(*remove_b);
+  CHECK(ns->list("/u").value().size() == 1);
+  CHECK_FALSE(ns->exists("/u/fb").value());
+
+  // Removing the last entry drops the whole mount point and restores the memfs node
+  auto remove_a = ns->unmount(std::string_view("a"), std::filesystem::path("/u"));
+  REQUIRE(remove_a.has_value());
+  CHECK(*remove_a);
+  CHECK(ns->get_info("/u").value().fs.name == "memfs");
+  CHECK_FALSE(ns->exists("/u/fa").value());
+
+  // No mount point is left, so a further unmount is a no-op
+  auto remove_again = ns->unmount(std::string_view("a"), std::filesystem::path("/u"));
+  REQUIRE(remove_again.has_value());
+  CHECK_FALSE(*remove_again);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns unmount removes an entire mount point", "[vns]") {
+  REQUIRE(ns->create_directory("/u").has_value());
+  tree_builder a;
+  a.file("fa");
+  tree_builder b;
+  b.file("fb");
+  REQUIRE(ns->mount("/u", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/u", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+  REQUIRE(ns->list("/u").value().size() == 2);
+
+  auto removed = ns->unmount(std::filesystem::path("/u"));
+  REQUIRE(removed.has_value());
+  CHECK(*removed);
+  CHECK(ns->get_info("/u").value().fs.name == "memfs");
+  CHECK_FALSE(ns->exists("/u/fa").value());
+  CHECK_FALSE(ns->exists("/u/fb").value());
+}
+
+// ---------------------------------------------------------------------------
+// mount variants (name / before / after / replace onto a union)
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns named mount can be unmounted by name", "[vns]") {
+  REQUIRE(ns->create_directory("/a").has_value());
+  tree_builder tree;
+  tree.file("f");
+  REQUIRE(ns->mount("/a", merge_flag::replace, true, "m1", localfs{ tree.root }).has_value());
+  CHECK(ns->get_info("/a/f").value().status == node_status::file);
+
+  auto wrong = ns->unmount(std::string_view("m2"), std::filesystem::path("/a"));
+  REQUIRE(wrong.has_value());
+  CHECK_FALSE(*wrong);
+
+  auto removed = ns->unmount(std::string_view("m1"), std::filesystem::path("/a"));
+  REQUIRE(removed.has_value());
+  CHECK(*removed);
+  CHECK(ns->get_info("/a").value().fs.name == "memfs");
+}
+
+TEST_CASE("vns mount before/after sets union priority", "[vns]") {
+  tree_builder a;
+  a.file("f", "1");
+  tree_builder b;
+  b.file("f", "333");
+
+  {
+    auto ns = make_namespace();
+    REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+    REQUIRE(ns->mount("/", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+    auto info = ns->get_info("/f");
+    REQUIRE(info.has_value());
+    CHECK(info->file->size == 3); // b is in front, so it wins
+    CHECK(ns->list("/").value().size() == 1);
+  }
+  {
+    auto ns = make_namespace();
+    REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+    REQUIRE(ns->mount("/", merge_flag::after, true, "b", localfs{ b.root }).has_value());
+    auto info = ns->get_info("/f");
+    REQUIRE(info.has_value());
+    CHECK(info->file->size == 1); // a is in front, so it wins
+    CHECK(ns->list("/").value().size() == 1);
+  }
+}
+
+TEST_CASE("vns mount replace shadows an existing union", "[vns]") {
+  tree_builder a;
+  a.file("fa");
+  tree_builder b;
+  b.file("fb");
+  tree_builder c;
+  c.file("fc");
+
+  auto ns = make_namespace();
+  REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+  CHECK(ns->list("/").value().size() == 2);
+
+  REQUIRE(ns->mount("/", merge_flag::replace, true, "c", localfs{ c.root }).has_value());
+  CHECK(ns->list("/").value().size() == 1);
+  CHECK(ns->exists("/fc").value());
+  CHECK_FALSE(ns->exists("/fa").value());
+  CHECK_FALSE(ns->exists("/fb").value());
+}
+
+TEST_CASE("vns resolves components from any union entry", "[vns]") {
+  tree_builder a;
+  a.dir("xa");
+  tree_builder b;
+  b.dir("xb");
+
+  auto ns = make_namespace();
+  REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+
+  // xb only exists in b (higher priority), xa only in a (lower priority)
+  CHECK(ns->status("/xb").value() == node_status::directory);
+  CHECK(ns->status("/xa").value() == node_status::directory);
+  CHECK(ns->list("/").value().size() == 2);
+}
+
+// ---------------------------------------------------------------------------
+// path normalization
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns normalizes paths", "[vns]") {
+  REQUIRE(ns->create_directory("/a").has_value());
+  REQUIRE(ns->create_directory("/a/b").has_value());
+
+  CHECK(ns->status("/a/b/").value() == node_status::directory);
+  CHECK(ns->status("/a/./b").value() == node_status::directory);
+  CHECK(ns->status("/a/b/..").value() == node_status::directory);
+  CHECK(ns->status("/a//b").value() == node_status::directory);
+  CHECK(ns->list("/a/").value().size() == 1);
+
+  // A trailing slash is removed on creation as well
+  REQUIRE(ns->create_directory("/c/d", true).has_value());
+  CHECK(ns->status("/c/d/").value() == node_status::directory);
+
+  // The root has no name and can't be created
+  auto root_dir = ns->create_directory("/");
+  REQUIRE_FALSE(root_dir.has_value());
+  CHECK(root_dir.error() == errc::invalid_name);
+  auto root_file = ns->create_file("/", placeholder_file_create_spec{});
+  REQUIRE_FALSE(root_file.has_value());
+  CHECK(root_file.error() == errc::invalid_name);
+}
+
+// ---------------------------------------------------------------------------
+// list / status / exists / get_info edge cases
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns query edge cases", "[vns]") {
+  REQUIRE(ns->create_directory("/d").has_value());
+  REQUIRE(ns->create_file("/f", placeholder_file_create_spec{}).has_value());
+
+  auto list_file = ns->list("/f");
+  REQUIRE_FALSE(list_file.has_value());
+  CHECK(list_file.error() == errc::not_a_dir);
+
+  auto list_missing = ns->list("/missing");
+  REQUIRE_FALSE(list_missing.has_value());
+  CHECK(list_missing.error() == errc::path_not_found);
+
+  CHECK(ns->status("/f").value() == node_status::file);
+  CHECK(ns->exists("/f", node_type::file).value());
+  CHECK_FALSE(ns->exists("/f", node_type::directory).value());
+  CHECK(ns->exists("/d", node_type::directory).value());
+
+  auto list_rel = ns->list("relative");
+  REQUIRE_FALSE(list_rel.has_value());
+  CHECK(list_rel.error() == errc::not_an_abs_path);
+  auto exists_rel = ns->exists("relative");
+  REQUIRE_FALSE(exists_rel.has_value());
+  CHECK(exists_rel.error() == errc::not_an_abs_path);
+  auto exists_nt_rel = ns->exists("relative", node_type::file);
+  REQUIRE_FALSE(exists_nt_rel.has_value());
+  CHECK(exists_nt_rel.error() == errc::not_an_abs_path);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns get_info reports the fs-relative path", "[vns]") {
+  tree_builder root_tree;
+  root_tree.dir("a");
+  tree_builder sub_tree;
+  sub_tree.file("hello");
+
+  REQUIRE(ns->mount("/", merge_flag::replace, true, localfs{ root_tree.root }).has_value());
+  REQUIRE(ns->mount("/a", merge_flag::replace, true, localfs{ sub_tree.root }).has_value());
+
+  auto info = ns->get_info("/a/hello");
+  REQUIRE(info.has_value());
+  CHECK(info->status == node_status::file);
+  CHECK(info->name == "hello");
+  CHECK(info->fs.name == "localfs");
+  CHECK(info->fs.path == std::filesystem::path("/hello"));
+}
+
+// ---------------------------------------------------------------------------
+// create / remove
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns create/remove error cases", "[vns]") {
+  REQUIRE(ns->create_directory("/d").has_value());
+  REQUIRE(ns->create_file("/f", placeholder_file_create_spec{}).has_value());
+
+  auto existing = ns->create_directory("/d");
+  REQUIRE_FALSE(existing.has_value());
+  CHECK(existing.error() == std::errc::file_exists);
+
+  auto parent_file = ns->create_directory("/f/child");
+  REQUIRE_FALSE(parent_file.has_value());
+  CHECK(parent_file.error() == errc::not_a_dir);
+
+  auto file_existing = ns->create_file("/f", placeholder_file_create_spec{});
+  REQUIRE_FALSE(file_existing.has_value());
+  CHECK(file_existing.error() == std::errc::file_exists);
+
+  CHECK(ns->remove("/f").has_value());
+  CHECK_FALSE(ns->exists("/f").value());
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns create and remove under a mount", "[vns]") {
+  tree_builder tree;
+  tree.dir("a");
+  REQUIRE(ns->mount("/", merge_flag::replace, true, localfs{ tree.root }).has_value());
+
+  // localfs has no placeholder concept: a placeholder file is a regular empty file there
+  REQUIRE(ns->create_file("/a/p", placeholder_file_create_spec{}).has_value());
+  CHECK(ns->get_info("/a/p").value().status == node_status::file);
+  CHECK(ns->get_info("/a/p").value().file->size == 0);
+
+  regular_file_create_spec regular_spec;
+  regular_spec.initial_size = 4;
+  REQUIRE(ns->create_file("/a/r", regular_spec).has_value());
+  CHECK(ns->get_info("/a/r").value().file->size == 4);
+
+  scalar_file_create_spec scalar_spec;
+  scalar_spec.init_value = std::any(1);
+  auto scalar = ns->create_file("/a/s", scalar_spec);
+  REQUIRE_FALSE(scalar.has_value());
+  CHECK(scalar.error() == errc::unsupported);
+
+  CHECK(ns->remove("/a/r").has_value());
+  CHECK_FALSE(ns->exists("/a/r").value());
+
+  // A read-only mount rejects create and remove
+  tree_builder ro;
+  ro.dir("a");
+  auto ro_ns = make_namespace();
+  REQUIRE(ro_ns->mount("/", merge_flag::replace, false, localfs{ ro.root }).has_value());
+  auto rmdir = ro_ns->remove("/a");
+  REQUIRE_FALSE(rmdir.has_value());
+  CHECK(rmdir.error() == errc::unsupported);
+  auto mkfile = ro_ns->create_file("/a/x", placeholder_file_create_spec{});
+  REQUIRE_FALSE(mkfile.has_value());
+  CHECK(mkfile.error() == errc::unsupported);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns remove rejects a mount point", "[vns]") {
+  REQUIRE(ns->create_directory("/a").has_value());
+  tree_builder tree;
+  tree.dir("sub");
+  REQUIRE(ns->mount("/a", merge_flag::replace, true, "a", localfs{ tree.root }).has_value());
+
+  auto removed = ns->remove("/a");
+  REQUIRE_FALSE(removed.has_value());
+  CHECK(removed.error() == errc::unsupported);
+
+  // The mount and the underlying file system are untouched
+  CHECK(ns->get_info("/a").value().fs.name == "localfs");
+  CHECK(ns->exists("/a/sub").value());
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns freeze blocks create and remove", "[vns]") {
+  REQUIRE(ns->create_directory("/d").has_value());
+  ns->freeze();
+
+  auto mkdir = ns->create_directory("/x");
+  REQUIRE_FALSE(mkdir.has_value());
+  CHECK(mkdir.error() == errc::frozen);
+
+  auto mkfile = ns->create_file("/f", placeholder_file_create_spec{});
+  REQUIRE_FALSE(mkfile.has_value());
+  CHECK(mkfile.error() == errc::frozen);
+
+  auto rm = ns->remove("/d");
+  REQUIRE_FALSE(rm.has_value());
+  CHECK(rm.error() == errc::frozen);
+}
+
+// ---------------------------------------------------------------------------
+// open_file / read-write helpers
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns open_file variants and control", "[vns]") {
+  REQUIRE(ns->create_directory("/d").has_value());
+  REQUIRE(ns->create_file("/d/r", regular_file_create_spec{}).has_value());
+  regular_file_create_spec mapped_spec;
+  mapped_spec.initial_size = 8;
+  REQUIRE(ns->create_file("/d/m", mapped_spec).has_value());
+  scalar_file_create_spec scalar_spec;
+  scalar_spec.init_value = std::any(7);
+  REQUIRE(ns->create_file("/d/s", scalar_spec).has_value());
+
+  CHECK(ns->open_file("/d/r", seq_stream_file_open_options{}).has_value());
+  CHECK(ns->open_file("/d/m", mapped_file_open_options{}).has_value());
+  CHECK(ns->open_file("/d/s", scalar_file_open_options{}).has_value());
+
+  // memfs doesn't support control files
+  auto control = ns->open_file("/d/r", control_file_open_options{});
+  REQUIRE_FALSE(control.has_value());
+  CHECK(control.error() == errc::unsupported);
+  auto executed = ns->execute("/d/r", "cmd", control_file_open_options{});
+  REQUIRE_FALSE(executed.has_value());
+  CHECK(executed.error() == errc::unsupported);
+
+  std::array<std::byte, 4> buffer{};
+  std::array<mutable_buffer, 1> read_buffers{ mutable_buffer(buffer) };
+  CHECK_FALSE(ns->read_all("/missing", read_buffers, {}).has_value());
+  CHECK_FALSE(ns->read_all("/d", read_buffers, {}).has_value());
+}
+
+TEST_CASE("vns write dispatch across a union", "[vns]") {
+  auto ns = make_namespace();
+  REQUIRE(ns->create_directory("/m").has_value());
+  REQUIRE(ns->mount("/m", merge_flag::replace, true, "m", memfs{}).has_value());
+  REQUIRE(ns->create_file("/m/memf", regular_file_create_spec{}).has_value());
+
+  tree_builder ro;
+  ro.file("rof", "ro"); // 2 bytes
+  REQUIRE(ns->mount("/m", merge_flag::before, false, "ro", localfs{ ro.root }).has_value());
+
+  // A name only present in the writable memfs entry resolves through the union
+  CHECK(ns->get_info("/m/memf").value().status == node_status::file);
+  CHECK(ns->get_info("/m/rof").value().status == node_status::file);
+
+  // /m/rof is served by the read-only (higher priority) entry, so writing to it fails
+  stream_file_open_options write_options;
+  write_options.mode = file_open_mode::write;
+  auto ro_write = ns->open_file("/m/rof", write_options);
+  REQUIRE_FALSE(ro_write.has_value());
+  CHECK(ro_write.error() == errc::unsupported);
+
+  // /m/memf is only in the writable entry, so writing it succeeds
+  auto mem_write = ns->open_file("/m/memf", write_options);
+  REQUIRE(mem_write.has_value());
+
+  // Creating a new child picks the first writable entry of the union
+  REQUIRE(ns->create_directory("/m/newdir").has_value());
+  CHECK(ns->status("/m/newdir").value() == node_status::directory);
+}
+
+// ---------------------------------------------------------------------------
+// shadow over unions / dynamic inheritance
+// ---------------------------------------------------------------------------
+
+TEST_CASE_METHOD(vns_fixture, "vns shadow copies an inherited union on mount", "[vns]") {
+  tree_builder a;
+  a.file("fa");
+  tree_builder b;
+  b.file("fb");
+  tree_builder c;
+  c.file("fc");
+  REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+
+  auto shadow = *ns->shadow();
+  // Adding to an inherited multi-entry mount point must copy-on-write
+  REQUIRE(shadow->mount("/", merge_flag::before, true, "c", localfs{ c.root }).has_value());
+  CHECK(shadow->get_info("/fc").value().status == node_status::file);
+  CHECK(shadow->get_info("/fa").value().status == node_status::file);
+  CHECK(shadow->list("/").value().size() == 3);
+
+  // The parent is untouched
+  CHECK(ns->get_info("/fc").value().status == node_status::not_found);
+  CHECK(ns->get_info("/fa").value().status == node_status::file);
+  CHECK(ns->list("/").value().size() == 2);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns shadow removes one entry from an inherited union", "[vns]") {
+  tree_builder a;
+  a.file("fa");
+  tree_builder b;
+  b.file("fb");
+  REQUIRE(ns->mount("/", merge_flag::replace, true, "a", localfs{ a.root }).has_value());
+  REQUIRE(ns->mount("/", merge_flag::before, true, "b", localfs{ b.root }).has_value());
+
+  auto shadow = *ns->shadow();
+  auto removed = shadow->unmount(std::string_view("b"), std::filesystem::path("/"));
+  REQUIRE(removed.has_value());
+  CHECK(*removed);
+
+  // The shadow no longer sees fb but still sees fa; the parent keeps both
+  CHECK(shadow->get_info("/fb").value().status == node_status::not_found);
+  CHECK(shadow->get_info("/fa").value().status == node_status::file);
+  CHECK(ns->get_info("/fb").value().status == node_status::file);
+  CHECK(ns->list("/").value().size() == 2);
+}
+
+TEST_CASE_METHOD(vns_fixture, "vns shadow sees later parent mounts", "[vns]") {
+  REQUIRE(ns->create_directory("/m").has_value());
+  auto shadow = *ns->shadow();
+  CHECK(shadow->get_info("/m").value().fs.name == "memfs");
+
+  tree_builder tree;
+  tree.file("inside");
+  REQUIRE(ns->mount("/m", merge_flag::replace, true, "m", localfs{ tree.root }).has_value());
+
+  CHECK(shadow->get_info("/m").value().fs.name == "localfs");
+  CHECK(shadow->get_info("/m/inside").value().status == node_status::file);
 }

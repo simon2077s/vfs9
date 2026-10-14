@@ -972,6 +972,11 @@ std::expected<void, std::error_code> vnamespace::remove(std::filesystem::path pa
   }
 
   auto result = lookup_path(path);
+  if (result.is_mount_point()) {
+    // A mount point can only be removed with unmount(); removing it through the underlying file
+    // system would delete the mounted root instead.
+    return std::unexpected(make_error_code(errc::unsupported));
+  }
   auto target = result.resolve_node_ref(true);
   if (!target) {
     return std::unexpected(target.error());
