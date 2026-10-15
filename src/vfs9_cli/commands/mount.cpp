@@ -18,8 +18,10 @@
 
 #include <boost/program_options.hpp>
 
-#include "vfs9/localfs/localfs.hpp"
-#include "vfs9/memfs/memfs.hpp"
+#include "vfs9/fs/local/fs.hpp"
+#include "vfs9/fs/mem/fs.hpp"
+#include "vfs9/fs/pak/fs.hpp"
+#include "vfs9/fs/zip/fs.hpp"
 #include "vfs9_cli/cli.hpp"
 
 namespace po = boost::program_options;
@@ -77,18 +79,30 @@ bool mount_command::run(cli& context, const std::vector<std::string>& args) {
 
   const auto mount_point = context.resolve_path(old_path);
   std::expected<void, std::error_code> result;
-  if (fs_name == "memfs") {
+  if (fs_name == "mem") {
     if (!fs_args.empty()) {
-      context.print_error("memfs takes no argument");
+      context.print_error("mem takes no argument");
       return true;
     }
     result = context.ns().mount(mount_point, *mflag, writable, name, vfs9::memfs{});
-  } else if (fs_name == "localfs") {
+  } else if (fs_name == "local") {
     if (fs_args.size() != 1) {
-      context.print_error("localfs requires exactly one argument: the root path");
+      context.print_error("local requires exactly one argument: the root path");
       return true;
     }
     result = context.ns().mount(mount_point, *mflag, writable, name, vfs9::localfs{ fs_args[0] });
+  } else if (fs_name == "zip") {
+    if (fs_args.size() != 1) {
+      context.print_error("zip requires exactly one argument: the archive path");
+      return true;
+    }
+    result = context.ns().mount(mount_point, *mflag, writable, name, vfs9::zipfs{ fs_args[0] });
+  } else if (fs_name == "pak") {
+    if (fs_args.size() != 1) {
+      context.print_error("pak requires exactly one argument: the archive path");
+      return true;
+    }
+    result = context.ns().mount(mount_point, *mflag, writable, name, vfs9::pakfs{ fs_args[0] });
   } else {
     context.print_error("unknown file system: " + fs_name);
     return true;

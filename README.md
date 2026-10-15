@@ -15,6 +15,7 @@ vfs9 目前处于早期开发阶段，已实现的后端包括：
 - `memfs` —— 纯内存文件系统，支持目录、placeholder / regular / scalar 文件，主要用于测试与临时数据。
 - `localfs` —— 将宿主机上的一个绝对路径目录映射为文件系统，只暴露目录与 regular 文件（符号链接会被跟随，scalar / control 文件不支持）。
 - `zipfs` —— 基于 `minizip-ng` 的只读 zip 归档文件系统：将 zip 文件内的目录 / 文件映射为文件系统。文件只以 regular 文件暴露，且只能通过 `seq_stream`（顺序流）打开；不支持 placeholder / scalar / control 文件，也不支持 stream / mapped 打开方式；seek 通过重新打开并重新解压条目实现（限制见后文）。
+- `pakfs` —— 无外部依赖的只读 Quake / id Tech `PACK`（`.pak`）归档文件系统：条目未压缩存储，因此文件既可以 `stream`（随机访问）也可以 `seq_stream` 打开（支持完整 seek）；不支持 placeholder / scalar / control / mapped，且不可写入。
 
 `archivefs`（归档文件后端）尚未实现。`vnamespace`（见 **核心类型**）已经暴露完整的基于路径的文件系统接口：查询、创建、删除、打开文件以及读写 / 执行辅助函数。
 
@@ -180,9 +181,11 @@ CLI内命令的所有路径参数可以是绝对路径也可以是相对路径�
 
 - `mount fs_name:name:args old_path [-a][-b][-w]`
 
-  挂载一个文件系统，fs_name 是 vfs9 支持的文件系统的名称；name是该挂载的名称（用于unmount时指定）；args是:分割的参数，参数格式由各个文件系统定义：
-  - memfs 没有参数
-  - localfs 参数是一个路径，该路径作为localfs的根目录
+  挂载一个文件系统，fs_name 是 vfs9 支持的文件系统的名称（即各文件系统 `name()` 的返回值）；name是该挂载的名称（用于unmount时指定）；args是:分割的参数，参数格式由各个文件系统定义：
+  - mem 没有参数（内存文件系统 memfs）
+  - local 参数是一个路径，该路径作为 local 的根目录（本地文件系统 localfs）
+  - zip 参数是一个（绝对）路径，指向作为 zip 后端的 zip 归档文件（归档文件系统 zipfs）
+  - pak 参数是一个（绝对）路径，指向作为 pak 后端的 Quake/id Tech pak 归档文件（归档文件系统 pakfs）
 
   old_path 参数是文件系统要挂载的位置，该位置必须为一个已存在的文件夹或联合目录。
 

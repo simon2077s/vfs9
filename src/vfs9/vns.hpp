@@ -25,7 +25,7 @@
 #include "vfs9/detail/lock.hpp"
 #include "vfs9/detail/mount_table.hpp"
 #include "vfs9/fs.hpp"
-#include "vfs9/memfs/memfs.hpp"
+#include "vfs9/fs/mem/fs.hpp"
 #include "vfs9/tracer.hpp"
 
 namespace vfs9 {

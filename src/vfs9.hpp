@@ -12,7 +12,8 @@
 
 #include "vfs9/file.hpp"
 #include "vfs9/fs.hpp"
-#include "vfs9/localfs/localfs.hpp"
-#include "vfs9/memfs/memfs.hpp"
+#include "vfs9/fs/local/fs.hpp"
+#include "vfs9/fs/mem/fs.hpp"
+#include "vfs9/fs/pak/fs.hpp"
+#include "vfs9/fs/zip/fs.hpp"
 #include "vfs9/vns.hpp"
-#include "vfs9/zipfs/zipfs.hpp"

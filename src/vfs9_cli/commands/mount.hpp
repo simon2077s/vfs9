@@ -30,7 +30,9 @@ public:
     return "mount fs_name:name[:args] old_path [-a][-b][-w]";
   }
 
-  std::string_view description() const noexcept override { return "Mount a file system to a directory"; }
+  std::string_view description() const noexcept override {
+    return "Mount a file system (mem, local, zip, pak) to a directory";
+  }
 
   bool run(cli& context, const std::vector<std::string>& args) override;
 };

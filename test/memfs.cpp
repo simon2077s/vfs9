@@ -9,7 +9,7 @@
  *
  */
 
-#include "vfs9/memfs/memfs.hpp"
+#include "vfs9/fs/mem/fs.hpp"
 
 #include <any>
 #include <array>
@@ -26,7 +26,7 @@ namespace {
 using namespace vfs9;
 
 struct memfs_fixture {
-  memfs_impl::fs_impl fs;
+  vfs9::fs::mem::fs_impl fs;
   memfs_fixture() { REQUIRE(fs.init(memfs{}).has_value()); }
 };
 
@@ -38,7 +38,7 @@ TEST_CASE_METHOD(memfs_fixture, "memfs root exists and is a directory", "[memfs]
   CHECK(fs.status("/") == node_status::directory);
   CHECK(fs.get_info("/").status == node_status::directory);
   CHECK(fs.get_info("/").name == "/");
-  CHECK(fs.get_info("/").fs.name == "memfs");
+  CHECK(fs.get_info("/").fs.name == "mem");
 }
 
 TEST_CASE_METHOD(memfs_fixture, "memfs create_directory", "[memfs]") {

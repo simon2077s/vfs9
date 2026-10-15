@@ -33,23 +33,29 @@ set(
   vfs9/fs.hpp
   vfs9/tracer.hpp
   vfs9/vns.hpp
-  vfs9/memfs/memfs.hpp
-  vfs9/memfs/node.hpp
-  vfs9/memfs/base_file_handle.hpp
-  vfs9/memfs/stream_file_handle.hpp
-  vfs9/memfs/seq_stream_file_handle.hpp
-  vfs9/memfs/mapped_file_handle.hpp
-  vfs9/memfs/scalar_file_handle.hpp
-  vfs9/localfs/localfs.hpp
-  vfs9/localfs/base_file_handle.hpp
-  vfs9/localfs/stream_file_handle.hpp
-  vfs9/localfs/seq_stream_file_handle.hpp
-  vfs9/localfs/mapped_file_handle.hpp
-  vfs9/zipfs/zipfs.hpp
-  vfs9/zipfs/node.hpp
-  vfs9/zipfs/mz_util.hpp
-  vfs9/zipfs/base_file_handle.hpp
-  vfs9/zipfs/seq_stream_file_handle.hpp
+  vfs9/fs/mem/fs.hpp
+  vfs9/fs/mem/node.hpp
+  vfs9/fs/mem/base_file_handle.hpp
+  vfs9/fs/mem/stream_file_handle.hpp
+  vfs9/fs/mem/seq_stream_file_handle.hpp
+  vfs9/fs/mem/mapped_file_handle.hpp
+  vfs9/fs/mem/scalar_file_handle.hpp
+  vfs9/fs/local/fs.hpp
+  vfs9/fs/local/open_registry.hpp
+  vfs9/fs/local/base_file_handle.hpp
+  vfs9/fs/local/stream_file_handle.hpp
+  vfs9/fs/local/seq_stream_file_handle.hpp
+  vfs9/fs/local/mapped_file_handle.hpp
+  vfs9/fs/zip/fs.hpp
+  vfs9/fs/zip/node.hpp
+  vfs9/fs/zip/mz_util.hpp
+  vfs9/fs/zip/base_file_handle.hpp
+  vfs9/fs/zip/seq_stream_file_handle.hpp
+  vfs9/fs/pak/fs.hpp
+  vfs9/fs/pak/node.hpp
+  vfs9/fs/pak/base_file_handle.hpp
+  vfs9/fs/pak/stream_file_handle.hpp
+  vfs9/fs/pak/seq_stream_file_handle.hpp
   vfs9/detail/file_handle.hpp
   vfs9/detail/fs.hpp
   vfs9/detail/lock.hpp
@@ -69,21 +75,26 @@ set(
   vfs9/error.cpp
   vfs9/file.cpp
   vfs9/vns.cpp
-  vfs9/memfs/memfs.cpp
-  vfs9/memfs/node.cpp
-  vfs9/memfs/base_file_handle.cpp
-  vfs9/memfs/stream_file_handle.cpp
-  vfs9/memfs/seq_stream_file_handle.cpp
-  vfs9/memfs/mapped_file_handle.cpp
-  vfs9/memfs/scalar_file_handle.cpp
-  vfs9/localfs/localfs.cpp
-  vfs9/localfs/base_file_handle.cpp
-  vfs9/localfs/stream_file_handle.cpp
-  vfs9/localfs/seq_stream_file_handle.cpp
-  vfs9/localfs/mapped_file_handle.cpp
-  vfs9/zipfs/zipfs.cpp
-  vfs9/zipfs/base_file_handle.cpp
-  vfs9/zipfs/seq_stream_file_handle.cpp
+  vfs9/fs/mem/fs.cpp
+  vfs9/fs/mem/node.cpp
+  vfs9/fs/mem/base_file_handle.cpp
+  vfs9/fs/mem/stream_file_handle.cpp
+  vfs9/fs/mem/seq_stream_file_handle.cpp
+  vfs9/fs/mem/mapped_file_handle.cpp
+  vfs9/fs/mem/scalar_file_handle.cpp
+  vfs9/fs/local/fs.cpp
+  vfs9/fs/local/open_registry.cpp
+  vfs9/fs/local/base_file_handle.cpp
+  vfs9/fs/local/stream_file_handle.cpp
+  vfs9/fs/local/seq_stream_file_handle.cpp
+  vfs9/fs/local/mapped_file_handle.cpp
+  vfs9/fs/zip/fs.cpp
+  vfs9/fs/zip/base_file_handle.cpp
+  vfs9/fs/zip/seq_stream_file_handle.cpp
+  vfs9/fs/pak/fs.cpp
+  vfs9/fs/pak/base_file_handle.cpp
+  vfs9/fs/pak/stream_file_handle.cpp
+  vfs9/fs/pak/seq_stream_file_handle.cpp
   vfs9/detail/file_handle.cpp
   vfs9/detail/fs.cpp
 )

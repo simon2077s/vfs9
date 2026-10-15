@@ -27,6 +27,9 @@ target_link_libraries(vfs9_test_localfs PRIVATE vfs9::static_lib Catch2::Catch2W
 add_executable(vfs9_test_vns vns.cpp)
 target_link_libraries(vfs9_test_vns PRIVATE vfs9::static_lib Catch2::Catch2WithMain)
 
+add_executable(vfs9_test_pakfs pak.cpp)
+target_link_libraries(vfs9_test_pakfs PRIVATE vfs9::static_lib Catch2::Catch2WithMain)
+
 add_executable(vfs9_test_zipfs zipfs.cpp)
 # The test uses the minizip-ng writer directly; only its include dirs are needed (the library itself is
 # already pulled in transitively through vfs9::static_lib).
@@ -40,4 +43,5 @@ catch_discover_tests(vfs9_test_node_tree)
 catch_discover_tests(vfs9_test_memfs)
 catch_discover_tests(vfs9_test_localfs)
 catch_discover_tests(vfs9_test_vns)
+catch_discover_tests(vfs9_test_pakfs)
 catch_discover_tests(vfs9_test_zipfs)

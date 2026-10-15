@@ -9,7 +9,7 @@
  *
  */
 
-#include "vfs9/localfs/localfs.hpp"
+#include "vfs9/fs/local/fs.hpp"
 
 #include <array>
 #include <atomic>
@@ -33,7 +33,7 @@ std::filesystem::path unique_root() {
 
 struct localfs_fixture {
   std::filesystem::path root;
-  localfs_impl::fs_impl fs;
+  vfs9::fs::local::fs_impl fs;
 
   localfs_fixture() {
     root = unique_root();
@@ -52,9 +52,9 @@ struct localfs_fixture {
 } // namespace
 
 TEST_CASE_METHOD(localfs_fixture, "localfs init requires an absolute directory", "[localfs]") {
-  CHECK(fs.name() == "localfs");
+  CHECK(fs.name() == "local");
 
-  localfs_impl::fs_impl other;
+  vfs9::fs::local::fs_impl other;
   CHECK_FALSE(other.init(localfs{ "relative/path" }).has_value());
   CHECK_FALSE(other.init(localfs{ root / "missing" }).has_value());
 

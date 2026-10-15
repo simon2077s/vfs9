@@ -23,7 +23,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "vfs9/localfs/localfs.hpp"
+#include "vfs9/fs/local/fs.hpp"
 
 namespace {
 
@@ -98,7 +98,7 @@ TEST_CASE_METHOD(vns_fixture, "vns root is a memfs directory", "[vns]") {
   auto info = ns->get_info("/");
   REQUIRE(info.has_value());
   CHECK(info->status == node_status::directory);
-  CHECK(info->fs.name == "memfs");
+  CHECK(info->fs.name == "mem");
 
   CHECK_FALSE(ns->exists("/missing").value());
   CHECK(ns->status("/missing").value() == node_status::not_found);
@@ -123,7 +123,7 @@ TEST_CASE_METHOD(vns_fixture, "vns mount replaces the root file system", "[vns]"
 
   auto info = ns->get_info("/");
   REQUIRE(info.has_value());
-  CHECK(info->fs.name == "localfs");
+  CHECK(info->fs.name == "local");
   CHECK(info->status == node_status::directory);
 
   auto entries = ns->list("/");
@@ -149,7 +149,7 @@ TEST_CASE_METHOD(vns_fixture, "vns resolves paths nested under a mount point", "
 
   auto info_a = ns->get_info("/a");
   REQUIRE(info_a.has_value());
-  CHECK(info_a->fs.name == "localfs");
+  CHECK(info_a->fs.name == "local");
   CHECK(info_a->status == node_status::directory);
 
   // Deeper mount, only reachable if the path resolution descends into the mount at /a
@@ -157,7 +157,7 @@ TEST_CASE_METHOD(vns_fixture, "vns resolves paths nested under a mount point", "
 
   auto info_ab = ns->get_info("/a/b");
   REQUIRE(info_ab.has_value());
-  CHECK(info_ab->fs.name == "localfs");
+  CHECK(info_ab->fs.name == "local");
   CHECK(info_ab->status == node_status::directory);
 
   // A file which lives in the fs mounted at /a
@@ -299,7 +299,7 @@ TEST_CASE_METHOD(vns_fixture, "vns unmount overloads", "[vns]") {
 
   tree_builder extra;
   REQUIRE(ns->mount("/a", merge_flag::replace, true, localfs{ extra.root }).has_value());
-  CHECK(ns->get_info("/a").value().fs.name == "localfs");
+  CHECK(ns->get_info("/a").value().fs.name == "local");
 
   // Remove the whole mount point by path
   auto removed = ns->unmount(std::filesystem::path("/a"));
@@ -311,7 +311,7 @@ TEST_CASE_METHOD(vns_fixture, "vns unmount overloads", "[vns]") {
   auto removed_root = ns->unmount(std::filesystem::path("/"));
   REQUIRE(removed_root.has_value());
   CHECK(*removed_root);
-  CHECK(ns->get_info("/").value().fs.name == "memfs");
+  CHECK(ns->get_info("/").value().fs.name == "mem");
 
   auto removed_again = ns->unmount(std::filesystem::path("/"));
   REQUIRE(removed_again.has_value());
@@ -325,7 +325,7 @@ TEST_CASE_METHOD(vns_fixture, "vns unmount overloads", "[vns]") {
   REQUIRE(ns->unmount().has_value());
   CHECK(ns->status("/a").value() == node_status::not_found);
   CHECK(ns->get_info("/").value().status == node_status::directory); // memfs root
-  CHECK(ns->get_info("/").value().fs.name == "memfs");
+  CHECK(ns->get_info("/").value().fs.name == "mem");
 }
 
 TEST_CASE_METHOD(vns_fixture, "vns shadow isolates mutations from the parent", "[vns]") {
@@ -387,7 +387,7 @@ TEST_CASE_METHOD(vns_fixture, "vns shadow can't remove an inherited mount point"
   // Neither the shadow nor the parent is corrupted
   CHECK(shadow->get_info("/a/f").value().status == node_status::file);
   CHECK(ns->get_info("/a/f").value().status == node_status::file);
-  CHECK(ns->get_info("/a").value().fs.name == "localfs");
+  CHECK(ns->get_info("/a").value().fs.name == "local");
 }
 
 TEST_CASE_METHOD(vns_fixture, "vns create and remove directory", "[vns]") {
@@ -421,7 +421,7 @@ TEST_CASE_METHOD(vns_fixture, "vns create directories under a mount point", "[vn
 
   REQUIRE(ns->create_directory("/a/new").has_value());
   CHECK(ns->status("/a/new").value() == node_status::directory);
-  CHECK(ns->get_info("/a/new").value().fs.name == "localfs");
+  CHECK(ns->get_info("/a/new").value().fs.name == "local");
 
   // Recursive creation below a mount point delegates the missing components to the mounted fs
   REQUIRE(ns->create_directory("/a/deep/nested", true).has_value());
@@ -543,7 +543,7 @@ TEST_CASE_METHOD(vns_fixture, "vns clone is an independent standalone namespace"
 
   auto root_info = cloned->get_info("/");
   REQUIRE(root_info.has_value());
-  CHECK(root_info->fs.name == "localfs");
+  CHECK(root_info->fs.name == "local");
 
   cloned->freeze();
   CHECK(cloned->is_frozen());
@@ -566,7 +566,7 @@ TEST_CASE_METHOD(vns_fixture, "vns clone is an independent standalone namespace"
   CHECK(shadow_clone->is_frozen() == false);
   auto shadow_root = shadow_clone->get_info("/");
   REQUIRE(shadow_root.has_value());
-  CHECK(shadow_root->fs.name == "localfs");
+  CHECK(shadow_root->fs.name == "local");
 }
 
 // ---------------------------------------------------------------------------
@@ -580,13 +580,13 @@ TEST_CASE_METHOD(vns_fixture, "vns unmount by source path and edge cases", "[vns
   REQUIRE(ns->mount("/", merge_flag::replace, true, localfs{ base.root }).has_value());
 
   REQUIRE(ns->bind("/src", "/dst", merge_flag::replace, true).has_value());
-  CHECK(ns->get_info("/dst").value().fs.name == "localfs");
+  CHECK(ns->get_info("/dst").value().fs.name == "local");
 
   // unmount(new_path, old_path) removes the bind by its source path
   auto removed = ns->unmount(std::filesystem::path("/src"), std::filesystem::path("/dst"));
   REQUIRE(removed.has_value());
   CHECK(*removed);
-  CHECK(ns->get_info("/dst").value().fs.name == "localfs"); // backed by base again
+  CHECK(ns->get_info("/dst").value().fs.name == "local"); // backed by base again
 
   // An unknown name on an existing mount point is not an error, it just doesn't match
   REQUIRE(ns->mount("/dst", merge_flag::replace, true, "m", localfs{ base.root }).has_value());
@@ -636,7 +636,7 @@ TEST_CASE_METHOD(vns_fixture, "vns union shrinks one entry at a time", "[vns]") 
   auto remove_a = ns->unmount(std::string_view("a"), std::filesystem::path("/u"));
   REQUIRE(remove_a.has_value());
   CHECK(*remove_a);
-  CHECK(ns->get_info("/u").value().fs.name == "memfs");
+  CHECK(ns->get_info("/u").value().fs.name == "mem");
   CHECK_FALSE(ns->exists("/u/fa").value());
 
   // No mount point is left, so a further unmount is a no-op
@@ -658,7 +658,7 @@ TEST_CASE_METHOD(vns_fixture, "vns unmount removes an entire mount point", "[vns
   auto removed = ns->unmount(std::filesystem::path("/u"));
   REQUIRE(removed.has_value());
   CHECK(*removed);
-  CHECK(ns->get_info("/u").value().fs.name == "memfs");
+  CHECK(ns->get_info("/u").value().fs.name == "mem");
   CHECK_FALSE(ns->exists("/u/fa").value());
   CHECK_FALSE(ns->exists("/u/fb").value());
 }
@@ -681,7 +681,7 @@ TEST_CASE_METHOD(vns_fixture, "vns named mount can be unmounted by name", "[vns]
   auto removed = ns->unmount(std::string_view("m1"), std::filesystem::path("/a"));
   REQUIRE(removed.has_value());
   CHECK(*removed);
-  CHECK(ns->get_info("/a").value().fs.name == "memfs");
+  CHECK(ns->get_info("/a").value().fs.name == "mem");
 }
 
 TEST_CASE("vns mount before/after sets union priority", "[vns]") {
@@ -818,7 +818,7 @@ TEST_CASE_METHOD(vns_fixture, "vns get_info reports the fs-relative path", "[vns
   REQUIRE(info.has_value());
   CHECK(info->status == node_status::file);
   CHECK(info->name == "hello");
-  CHECK(info->fs.name == "localfs");
+  CHECK(info->fs.name == "local");
   CHECK(info->fs.path == std::filesystem::path("/hello"));
 }
 
@@ -894,7 +894,7 @@ TEST_CASE_METHOD(vns_fixture, "vns remove rejects a mount point", "[vns]") {
   CHECK(removed.error() == errc::unsupported);
 
   // The mount and the underlying file system are untouched
-  CHECK(ns->get_info("/a").value().fs.name == "localfs");
+  CHECK(ns->get_info("/a").value().fs.name == "local");
   CHECK(ns->exists("/a/sub").value());
 }
 
@@ -1027,12 +1027,12 @@ TEST_CASE_METHOD(vns_fixture, "vns shadow removes one entry from an inherited un
 TEST_CASE_METHOD(vns_fixture, "vns shadow sees later parent mounts", "[vns]") {
   REQUIRE(ns->create_directory("/m").has_value());
   auto shadow = *ns->shadow();
-  CHECK(shadow->get_info("/m").value().fs.name == "memfs");
+  CHECK(shadow->get_info("/m").value().fs.name == "mem");
 
   tree_builder tree;
   tree.file("inside");
   REQUIRE(ns->mount("/m", merge_flag::replace, true, "m", localfs{ tree.root }).has_value());
 
-  CHECK(shadow->get_info("/m").value().fs.name == "localfs");
+  CHECK(shadow->get_info("/m").value().fs.name == "local");
   CHECK(shadow->get_info("/m/inside").value().status == node_status::file);
 }

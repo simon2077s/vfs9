@@ -33,10 +33,6 @@ namespace detail {
  */
 class file_system {
 public:
-  /**
-   * @brief Construct a new file system object
-   *
-   */
   file_system() : id_(++next_id_) {}
 
   virtual ~file_system() = default;
@@ -47,11 +43,6 @@ public:
   file_system& operator=(const file_system&) = delete;
   file_system& operator=(file_system&&) = delete;
 
-  /**
-   * @brief Get unique id
-   *
-   * @return uint32_t
-   */
   inline uint32_t id() const noexcept { return id_; }
 
   virtual bool exists(const std::filesystem::path& path) = 0;
@@ -80,8 +71,7 @@ public:
 
   virtual std::expected<void, std::error_code> create_directory(const std::filesystem::path& path) = 0;
 
-  virtual std::expected<void, std::error_code> create_directory(const std::filesystem::path& path,
-                                                                bool recursive) = 0;
+  virtual std::expected<void, std::error_code> create_directory(const std::filesystem::path& path, bool recursive) = 0;
 
   virtual std::expected<void, std::error_code> create_file(const std::filesystem::path& path,
                                                            placeholder_file_create_spec spec) = 0;
@@ -96,17 +86,17 @@ public:
 
   virtual std::expected<void, std::error_code> remove(const std::filesystem::path& path, bool recursive) = 0;
 
-  virtual std::expected<std::shared_ptr<stream_file>, std::error_code>
-  open_file(const std::filesystem::path& path, stream_file_open_options options) = 0;
+  virtual std::expected<std::shared_ptr<stream_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                                 stream_file_open_options options) = 0;
 
   virtual std::expected<std::shared_ptr<seq_stream_file>, std::error_code>
   open_file(const std::filesystem::path& path, seq_stream_file_open_options options) = 0;
 
-  virtual std::expected<std::shared_ptr<mapped_file>, std::error_code>
-  open_file(const std::filesystem::path& path, mapped_file_open_options options) = 0;
+  virtual std::expected<std::shared_ptr<mapped_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                                 mapped_file_open_options options) = 0;
 
-  virtual std::expected<std::shared_ptr<scalar_file>, std::error_code>
-  open_file(const std::filesystem::path& path, scalar_file_open_options options) = 0;
+  virtual std::expected<std::shared_ptr<scalar_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                                 scalar_file_open_options options) = 0;
 
   virtual std::expected<std::shared_ptr<control_file>, std::error_code>
   open_file(const std::filesystem::path& path, control_file_open_options options) = 0;
@@ -166,9 +156,7 @@ public:
 
   bool exists(const std::filesystem::path& path, node_type nt) override { return impl_.exists(path, nt); }
 
-  bool exists(const std::filesystem::path& path, std::string_view name) override {
-    return impl_.exists(path, name);
-  }
+  bool exists(const std::filesystem::path& path, std::string_view name) override { return impl_.exists(path, name); }
 
   bool exists(const std::filesystem::path& path, std::string_view name, node_type nt) override {
     return impl_.exists(path, name, nt);
@@ -191,8 +179,7 @@ public:
 
   node_info get_info(const std::filesystem::path& path) override { return impl_.get_info(path); }
 
-  std::expected<void, std::error_code> list(const std::filesystem::path& path,
-                                            std::vector<node_entry>& out) override {
+  std::expected<void, std::error_code> list(const std::filesystem::path& path, std::vector<node_entry>& out) override {
     return impl_.list(path, out);
   }
 
@@ -200,8 +187,7 @@ public:
     return impl_.create_directory(path);
   }
 
-  std::expected<void, std::error_code> create_directory(const std::filesystem::path& path,
-                                                        bool recursive) override {
+  std::expected<void, std::error_code> create_directory(const std::filesystem::path& path, bool recursive) override {
     return impl_.create_directory(path, recursive);
   }
 
@@ -220,16 +206,14 @@ public:
     return impl_.create_file(path, spec);
   }
 
-  std::expected<void, std::error_code> remove(const std::filesystem::path& path) override {
-    return impl_.remove(path);
-  }
+  std::expected<void, std::error_code> remove(const std::filesystem::path& path) override { return impl_.remove(path); }
 
   std::expected<void, std::error_code> remove(const std::filesystem::path& path, bool recursive) override {
     return impl_.remove(path, recursive);
   }
 
-  std::expected<std::shared_ptr<stream_file>, std::error_code>
-  open_file(const std::filesystem::path& path, stream_file_open_options options) override {
+  std::expected<std::shared_ptr<stream_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                         stream_file_open_options options) override {
     return impl_.open_file(path, options);
   }
 
@@ -238,18 +222,18 @@ public:
     return impl_.open_file(path, options);
   }
 
-  std::expected<std::shared_ptr<mapped_file>, std::error_code>
-  open_file(const std::filesystem::path& path, mapped_file_open_options options) override {
+  std::expected<std::shared_ptr<mapped_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                         mapped_file_open_options options) override {
     return impl_.open_file(path, options);
   }
 
-  std::expected<std::shared_ptr<scalar_file>, std::error_code>
-  open_file(const std::filesystem::path& path, scalar_file_open_options options) override {
+  std::expected<std::shared_ptr<scalar_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                         scalar_file_open_options options) override {
     return impl_.open_file(path, options);
   }
 
-  std::expected<std::shared_ptr<control_file>, std::error_code>
-  open_file(const std::filesystem::path& path, control_file_open_options options) override {
+  std::expected<std::shared_ptr<control_file>, std::error_code> open_file(const std::filesystem::path& path,
+                                                                          control_file_open_options options) override {
     return impl_.open_file(path, options);
   }
 

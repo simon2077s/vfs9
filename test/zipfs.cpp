@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2026
  *
  */
-#include "vfs9/zipfs/zipfs.hpp"
+#include "vfs9/fs/zip/fs.hpp"
 
 #include <array>
 #include <atomic>
@@ -96,10 +96,10 @@ std::string to_string(const std::vector<std::byte>& data) {
 } // namespace
 
 TEST_CASE_METHOD(zip_fixture, "zipfs init validates the archive path", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
-  CHECK(fs.name() == "zipfs");
+  vfs9::fs::zip::fs_impl fs;
+  CHECK(fs.name() == "zip");
 
-  zipfs_impl::fs_impl other;
+  vfs9::fs::zip::fs_impl other;
   CHECK_FALSE(other.init(zipfs{ "relative.zip" }).has_value());
   CHECK_FALSE(other.init(zipfs{ std::filesystem::temp_directory_path() / "vfs9_zipfs_missing.zip" }).has_value());
   CHECK_FALSE(other.init(zipfs{ std::filesystem::temp_directory_path() }).has_value()); // a directory
@@ -109,7 +109,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs init validates the archive path", "[zipfs]"
 }
 
 TEST_CASE_METHOD(zip_fixture, "zipfs exposes the archive tree", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
+  vfs9::fs::zip::fs_impl fs;
   REQUIRE(fs.init(zipfs{ path }).has_value());
 
   CHECK(fs.exists("/"));
@@ -169,7 +169,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs exposes the archive tree", "[zipfs]") {
   auto info = fs.get_info("/dir/a.txt");
   CHECK(info.status == node_status::file);
   CHECK(info.name == "a.txt");
-  CHECK(info.fs.name == "zipfs");
+  CHECK(info.fs.name == "zip");
   CHECK(info.fs.path == std::filesystem::path("/dir/a.txt"));
   REQUIRE(info.file.has_value());
   CHECK(info.file->type == file_type::regular);
@@ -178,7 +178,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs exposes the archive tree", "[zipfs]") {
 }
 
 TEST_CASE_METHOD(zip_fixture, "zipfs refuses to remove an open file", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
+  vfs9::fs::zip::fs_impl fs;
   REQUIRE(fs.init(zipfs{ path }).has_value());
 
   auto file = fs.open_file("/readme.txt", seq_stream_file_open_options{});
@@ -191,7 +191,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs refuses to remove an open file", "[zipfs]")
 }
 
 TEST_CASE_METHOD(zip_fixture, "zipfs read-only operations are unsupported", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
+  vfs9::fs::zip::fs_impl fs;
   REQUIRE(fs.init(zipfs{ path }).has_value());
 
   CHECK_FALSE(fs.create_directory("/new").has_value());
@@ -209,7 +209,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs read-only operations are unsupported", "[zi
 }
 
 TEST_CASE_METHOD(zip_fixture, "zipfs seq stream reads entry content", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
+  vfs9::fs::zip::fs_impl fs;
   REQUIRE(fs.init(zipfs{ path }).has_value());
 
   auto file = fs.open_file("/dir/a.txt", seq_stream_file_open_options{});
@@ -236,7 +236,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs seq stream reads entry content", "[zipfs]")
 }
 
 TEST_CASE_METHOD(zip_fixture, "zipfs seq stream seek behavior", "[zipfs]") {
-  zipfs_impl::fs_impl fs;
+  vfs9::fs::zip::fs_impl fs;
   REQUIRE(fs.init(zipfs{ path }).has_value());
   auto file = fs.open_file("/readme.txt", seq_stream_file_open_options{});
   REQUIRE(file.has_value());
@@ -281,7 +281,7 @@ TEST_CASE_METHOD(zip_fixture, "zipfs integrates with the namespace", "[zipfs]") 
   REQUIRE(ns->mount("/z", merge_flag::replace, true, zipfs{ path }).has_value());
 
   CHECK(ns->status("/z/dir/sub/b.txt").value() == node_status::file);
-  CHECK(ns->get_info("/z/dir/a.txt").value().fs.name == "zipfs");
+  CHECK(ns->get_info("/z/dir/a.txt").value().fs.name == "zip");
 
   auto entries = ns->list("/z/dir");
   REQUIRE(entries.has_value());
