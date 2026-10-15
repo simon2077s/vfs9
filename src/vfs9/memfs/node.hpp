@@ -118,6 +118,29 @@ public:
   inline void set_size(size_t size) noexcept { size_ = size; }
 
   /**
+   * @brief Get the number of open file handles referencing this node
+   *
+   * @return size_t
+   */
+  inline size_t open_count() const noexcept { return open_count_; }
+
+  /**
+   * @brief Mark this node as referenced by one more open file handle
+   *
+   */
+  inline void acquire() noexcept { ++open_count_; }
+
+  /**
+   * @brief Release one open file handle reference
+   *
+   */
+  inline void release() noexcept {
+    if (open_count_ > 0) {
+      --open_count_;
+    }
+  }
+
+  /**
    * @brief Ensure the backing section and its mapped view can hold at least `needed` bytes
    *
    *  Creates the anonymous section (and map) on first use, grows and remaps it when necessary.
@@ -133,6 +156,7 @@ private:
   std::optional<llfio::section_handle> section_; // Regular file backing
   std::optional<llfio::map_handle> map_;         // Mapped view of section_
   std::any scalar_;                              // Scalar file value
+  size_t open_count_ = 0;                        // Number of open file handles
 };
 
 } // namespace memfs_impl

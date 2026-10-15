@@ -13,6 +13,7 @@ FetchContent_MakeAvailable(cpp-linenoise)
 find_package(Boost CONFIG REQUIRED program_options json)
 find_package(Threads REQUIRED)
 find_package(llfio CONFIG REQUIRED)
+find_package(minizip-ng CONFIG REQUIRED)
 
 add_library(vfs9_static_lib STATIC)
 add_library(vfs9::static_lib ALIAS vfs9_static_lib)
@@ -20,6 +21,7 @@ add_library(vfs9::static_lib ALIAS vfs9_static_lib)
 target_include_directories(vfs9_static_lib PUBLIC ../src)
 target_link_libraries(vfs9_static_lib PUBLIC Boost::boost)
 target_link_libraries(vfs9_static_lib PUBLIC llfio::sl)
+target_link_libraries(vfs9_static_lib PRIVATE MINIZIP::minizip-ng)
 
 # Header files
 set(
@@ -43,6 +45,11 @@ set(
   vfs9/localfs/stream_file_handle.hpp
   vfs9/localfs/seq_stream_file_handle.hpp
   vfs9/localfs/mapped_file_handle.hpp
+  vfs9/zipfs/zipfs.hpp
+  vfs9/zipfs/node.hpp
+  vfs9/zipfs/mz_util.hpp
+  vfs9/zipfs/base_file_handle.hpp
+  vfs9/zipfs/seq_stream_file_handle.hpp
   vfs9/detail/file_handle.hpp
   vfs9/detail/fs.hpp
   vfs9/detail/lock.hpp
@@ -74,6 +81,9 @@ set(
   vfs9/localfs/stream_file_handle.cpp
   vfs9/localfs/seq_stream_file_handle.cpp
   vfs9/localfs/mapped_file_handle.cpp
+  vfs9/zipfs/zipfs.cpp
+  vfs9/zipfs/base_file_handle.cpp
+  vfs9/zipfs/seq_stream_file_handle.cpp
   vfs9/detail/file_handle.cpp
   vfs9/detail/fs.cpp
 )

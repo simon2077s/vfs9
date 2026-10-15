@@ -14,6 +14,7 @@ vfs9 目前处于早期开发阶段，已实现的后端包括：
 
 - `memfs` —— 纯内存文件系统，支持目录、placeholder / regular / scalar 文件，主要用于测试与临时数据。
 - `localfs` —— 将宿主机上的一个绝对路径目录映射为文件系统，只暴露目录与 regular 文件（符号链接会被跟随，scalar / control 文件不支持）。
+- `zipfs` —— 基于 `minizip-ng` 的只读 zip 归档文件系统：将 zip 文件内的目录 / 文件映射为文件系统。文件只以 regular 文件暴露，且只能通过 `seq_stream`（顺序流）打开；不支持 placeholder / scalar / control 文件，也不支持 stream / mapped 打开方式；seek 通过重新打开并重新解压条目实现（限制见后文）。
 
 `archivefs`（归档文件后端）尚未实现。`vnamespace`（见 **核心类型**）已经暴露完整的基于路径的文件系统接口：查询、创建、删除、打开文件以及读写 / 执行辅助函数。
 
@@ -25,6 +26,7 @@ vfs9 目前处于早期开发阶段，已实现的后端包括：
 - **C++23** 编译器：代码大量使用 `std::expected` 等 C++23 特性
 - **Boost**：需要 `program_options`、`json` 组件
 - **llfio**：推荐通过 vcpkg 安装
+- **minizip-ng**：`zipfs` 后端依赖（`vcpkg install minizip-ng[zlib]`，读取 deflate 条目需要 zlib 特性）
 - **Threads**
 
 测试与基准依赖由 CMake 通过 `FetchContent` 自动拉取：Catch2 v3.5.2（测试）、Google Benchmark v1.9.5（基准）。
@@ -87,6 +89,8 @@ ctest --test-dir build --output-on-failure
 - 如果 old 路径有多个节点，且挂载、绑定的节点都不可写入，同时 old 原始节点没有被遮蔽则会尝试写入 old 原始节点（原始节点默认是可写入的）
 
 如果最终选中的目标节点不可写入（例如该节点来自一个以只读方式挂载或绑定的文件系统），则写入会失败并返回 `errc::unsupported`。
+
+类似地，删除一个正在被打开的文件也会失败并返回 `errc::file_in_use`，需要先关闭对应的文件句柄。该检查由各文件系统后端实现：`memfs` 统计每个节点上的打开计数，`localfs` 通过共享的 `open_registry` 记录已打开的路径，`zipfs` 本身只读、拒绝一切删除。
 
 ### 单值文件
 

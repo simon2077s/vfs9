@@ -15,10 +15,11 @@
 namespace vfs9 {
 namespace localfs_impl {
 
-mapped_file_handle::mapped_file_handle(llfio::mapped_file_handle mapped,
+mapped_file_handle::mapped_file_handle(std::shared_ptr<open_registry> registry,
+                                       llfio::mapped_file_handle mapped,
                                        std::filesystem::path local_path,
                                        std::filesystem::path path)
-    : base_file_handle(std::move(local_path), std::move(path)), mapped_(std::move(mapped)) {}
+    : base_file_handle(std::move(registry), std::move(local_path), std::move(path)), mapped_(std::move(mapped)) {}
 
 size_t mapped_file_handle::max_size() const noexcept {
   auto result = mapped_.maximum_extent();

@@ -35,11 +35,15 @@ public:
   /**
    * @brief Construct a new stream file handle object
    *
+   * @param registry Open file registry
    * @param file Local file handle
    * @param local_path Local OS path
    * @param path Path relative to the file system root
    */
-  stream_file_handle(llfio::file_handle file, std::filesystem::path local_path, std::filesystem::path path);
+  stream_file_handle(std::shared_ptr<open_registry> registry,
+                     llfio::file_handle file,
+                     std::filesystem::path local_path,
+                     std::filesystem::path path);
 
   /**
    * @brief File max size

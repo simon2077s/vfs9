@@ -19,6 +19,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "vfs9/error.hpp"
+
 namespace {
 
 using namespace vfs9;
@@ -197,4 +199,26 @@ TEST_CASE_METHOD(memfs_fixture, "memfs scalar file read and write", "[memfs]") {
 TEST_CASE_METHOD(memfs_fixture, "memfs control file is unsupported", "[memfs]") {
   REQUIRE(fs.create_file("/c", placeholder_file_create_spec{}).has_value());
   CHECK_FALSE(fs.open_file("/c", control_file_open_options{}).has_value());
+}
+
+TEST_CASE_METHOD(memfs_fixture, "memfs refuses to remove an open file", "[memfs]") {
+  REQUIRE(fs.create_directory("/d").has_value());
+  REQUIRE(fs.create_file("/d/f", regular_file_create_spec{}).has_value());
+
+  auto file = fs.open_file("/d/f", stream_file_open_options{});
+  REQUIRE(file.has_value());
+
+  // Removing the open file (or its parent directory) must be refused
+  auto removed_file = fs.remove("/d/f");
+  REQUIRE_FALSE(removed_file.has_value());
+  CHECK(removed_file.error() == errc::file_in_use);
+
+  auto removed_dir = fs.remove("/d", true);
+  REQUIRE_FALSE(removed_dir.has_value());
+  CHECK(removed_dir.error() == errc::file_in_use);
+
+  // Once the handle is closed the file can be removed
+  file.value().reset();
+  CHECK(fs.remove("/d/f").has_value());
+  CHECK_FALSE(fs.exists("/d/f"));
 }

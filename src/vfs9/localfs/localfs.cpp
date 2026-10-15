@@ -297,6 +297,9 @@ std::expected<void, std::error_code> fs_impl::create_file(const std::filesystem:
 }
 
 std::expected<void, std::error_code> fs_impl::remove(const std::filesystem::path& path) noexcept {
+  if (open_registry_->has_open_at_or_below(path)) {
+    return std::unexpected(make_error_code(errc::file_in_use));
+  }
   std::error_code ec;
   if (!std::filesystem::remove(local_path(path), ec)) {
     if (!ec) {
@@ -308,6 +311,9 @@ std::expected<void, std::error_code> fs_impl::remove(const std::filesystem::path
 }
 
 std::expected<void, std::error_code> fs_impl::remove(const std::filesystem::path& path, bool recursive) noexcept {
+  if (open_registry_->has_open_at_or_below(path)) {
+    return std::unexpected(make_error_code(errc::file_in_use));
+  }
   std::error_code ec;
   if (recursive) {
     if (!std::filesystem::remove_all(local_path(path), ec)) {
@@ -343,7 +349,7 @@ fs_impl::open_file(const std::filesystem::path& path, stream_file_open_options o
     return std::unexpected(make_error_code(file.error()));
   }
   auto handle = detail::make_stream_file_handle<localfs_impl::stream_file_handle>(
-      options.mode, std::move(file).value(), local, path);
+      options.mode, open_registry_, std::move(file).value(), local, path);
   return std::make_shared<stream_file>(options.mode, std::move(handle));
 }
 
@@ -363,7 +369,7 @@ fs_impl::open_file(const std::filesystem::path& path, seq_stream_file_open_optio
     return std::unexpected(make_error_code(file.error()));
   }
   auto handle = detail::make_seq_stream_file_handle<localfs_impl::seq_stream_file_handle>(
-      options.mode, std::move(file).value(), local, path);
+      options.mode, open_registry_, std::move(file).value(), local, path);
   return std::make_shared<seq_stream_file>(options.mode, std::move(handle));
 }
 
@@ -389,7 +395,7 @@ fs_impl::open_file(const std::filesystem::path& path, mapped_file_open_options o
     return std::unexpected(make_error_code(mapped.error()));
   }
   auto handle = detail::make_mapped_file_handle<localfs_impl::mapped_file_handle>(
-      options.mode, std::move(mapped).value(), local, path);
+      options.mode, open_registry_, std::move(mapped).value(), local, path);
   return std::make_shared<mapped_file>(options.mode, std::move(handle));
 }
 

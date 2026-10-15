@@ -39,7 +39,7 @@ public:
   base_file_handle(const base_file_handle&) = delete;
   base_file_handle(base_file_handle&&) = default;
 
-  virtual ~base_file_handle() = default;
+  virtual ~base_file_handle();
 
   base_file_handle& operator=(const base_file_handle&) = delete;
   base_file_handle& operator=(base_file_handle&&) = default;

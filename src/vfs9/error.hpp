@@ -40,7 +40,8 @@ BOOST_DEFINE_ENUM_CLASS(errc,
                         not_a_dir_or_union_dir,
                         different_node_type,
                         must_be_standalone_ns,
-                        scalar_value_type_mismatch);
+                        scalar_value_type_mismatch,
+                        file_in_use);
 
 /**
  * @brief Error category

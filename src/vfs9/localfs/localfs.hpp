@@ -20,6 +20,7 @@
 #include "vfs9/detail/type_traits.hpp"
 #include "vfs9/file.hpp"
 #include "vfs9/fs.hpp"
+#include "vfs9/localfs/base_file_handle.hpp"
 
 namespace vfs9 {
 
@@ -119,7 +120,8 @@ private:
    */
   std::filesystem::path local_path(const std::filesystem::path& path) const noexcept;
 
-  std::filesystem::path root_; // Local root path
+  std::filesystem::path root_;                                               // Local root path
+  std::shared_ptr<open_registry> open_registry_ = std::make_shared<open_registry>(); // Open file registry
 };
 
 } // namespace localfs_impl

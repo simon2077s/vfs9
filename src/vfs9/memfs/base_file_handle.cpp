@@ -17,7 +17,17 @@ namespace vfs9 {
 namespace memfs_impl {
 
 base_file_handle::base_file_handle(node_pointer node, std::filesystem::path path)
-    : node_(std::move(node)), path_(std::move(path)) {}
+    : node_(std::move(node)), path_(std::move(path)) {
+  if (node_) {
+    node_->acquire();
+  }
+}
+
+base_file_handle::~base_file_handle() {
+  if (node_) {
+    node_->release();
+  }
+}
 
 node_info base_file_handle::get_info() const noexcept {
   node_info info{};

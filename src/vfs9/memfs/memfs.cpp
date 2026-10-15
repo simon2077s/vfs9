@@ -164,8 +164,26 @@ std::expected<void, std::error_code> fs_impl::remove_node(const std::filesystem:
   if (!path.is_absolute()) {
     return std::unexpected(make_error_code(errc::not_an_abs_path));
   }
-  if (!tree_.find(path)) {
+  auto node = tree_.find(path);
+  if (!node) {
     return std::unexpected(make_error_code(errc::path_not_found));
+  }
+
+  // Refuse to remove a file which is currently open (or a directory containing such a file).
+  auto has_open_file = [](auto&& self, const node_ptr& p_node) -> bool {
+    if (p_node->type() == node_type::file) {
+      return p_node->open_count() > 0;
+    }
+    bool found = false;
+    p_node->children().for_each([&](std::string_view, const node_ptr& child) {
+      if (!found && self(self, child)) {
+        found = true;
+      }
+    });
+    return found;
+  };
+  if (has_open_file(has_open_file, node)) {
+    return std::unexpected(make_error_code(errc::file_in_use));
   }
 
   auto begin = path.begin();

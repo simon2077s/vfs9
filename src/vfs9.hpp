@@ -15,3 +15,4 @@
 #include "vfs9/localfs/localfs.hpp"
 #include "vfs9/memfs/memfs.hpp"
 #include "vfs9/vns.hpp"
+#include "vfs9/zipfs/zipfs.hpp"

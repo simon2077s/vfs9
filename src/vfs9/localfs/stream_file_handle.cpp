@@ -16,10 +16,11 @@
 namespace vfs9 {
 namespace localfs_impl {
 
-stream_file_handle::stream_file_handle(llfio::file_handle file,
+stream_file_handle::stream_file_handle(std::shared_ptr<open_registry> registry,
+                                       llfio::file_handle file,
                                        std::filesystem::path local_path,
                                        std::filesystem::path path)
-    : base_file_handle(std::move(local_path), std::move(path)), file_(std::move(file)) {}
+    : base_file_handle(std::move(registry), std::move(local_path), std::move(path)), file_(std::move(file)) {}
 
 size_t stream_file_handle::max_size() const noexcept {
   auto result = file_.maximum_extent();

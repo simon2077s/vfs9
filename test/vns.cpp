@@ -515,6 +515,23 @@ TEST_CASE_METHOD(vns_fixture, "vns writes are dispatched to the first writable m
   CHECK_FALSE(std::filesystem::exists(readonly.root / "created"));
 }
 
+TEST_CASE_METHOD(vns_fixture, "vns refuses to remove an open file", "[vns]") {
+  REQUIRE(ns->create_directory("/d").has_value());
+  REQUIRE(ns->create_file("/d/f", regular_file_create_spec{}).has_value());
+
+  auto file = ns->open_file("/d/f", stream_file_open_options{});
+  REQUIRE(file.has_value());
+
+  auto removed = ns->remove("/d/f");
+  REQUIRE_FALSE(removed.has_value());
+  CHECK(removed.error() == errc::file_in_use);
+
+  // Closing the handle allows the file to be removed
+  file.value().reset();
+  CHECK(ns->remove("/d/f").has_value());
+  CHECK_FALSE(ns->exists("/d/f").value());
+}
+
 TEST_CASE_METHOD(vns_fixture, "vns clone is an independent standalone namespace", "[vns]") {
   tree_builder tree;
   tree.dir("a");

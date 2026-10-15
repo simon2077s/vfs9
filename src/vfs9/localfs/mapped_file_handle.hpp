@@ -33,11 +33,15 @@ public:
   /**
    * @brief Construct a new mapped file handle object
    *
+   * @param registry Open file registry
    * @param mapped Mapped file handle
    * @param local_path Local OS path
    * @param path Path relative to the file system root
    */
-  mapped_file_handle(llfio::mapped_file_handle mapped, std::filesystem::path local_path, std::filesystem::path path);
+  mapped_file_handle(std::shared_ptr<open_registry> registry,
+                     llfio::mapped_file_handle mapped,
+                     std::filesystem::path local_path,
+                     std::filesystem::path path);
 
   /**
    * @brief File max size

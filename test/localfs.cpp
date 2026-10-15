@@ -20,6 +20,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "vfs9/error.hpp"
+
 namespace {
 
 using namespace vfs9;
@@ -212,4 +214,28 @@ TEST_CASE_METHOD(localfs_fixture, "localfs scalar and control are unsupported", 
 
   control_file_open_options control_options;
   CHECK_FALSE(fs.open_file("/a/f", control_options).has_value());
+}
+
+TEST_CASE_METHOD(localfs_fixture, "localfs refuses to remove an open file", "[localfs]") {
+  REQUIRE(fs.create_directory("/a").has_value());
+  REQUIRE(fs.create_file("/a/f", regular_file_create_spec{}).has_value());
+
+  stream_file_open_options options;
+  options.mode = file_open_mode::write;
+  auto file = fs.open_file("/a/f", options);
+  REQUIRE(file.has_value());
+
+  // Removing the open file (or its parent directory) must be refused
+  auto removed_file = fs.remove("/a/f");
+  REQUIRE_FALSE(removed_file.has_value());
+  CHECK(removed_file.error() == errc::file_in_use);
+
+  auto removed_dir = fs.remove("/a", true);
+  REQUIRE_FALSE(removed_dir.has_value());
+  CHECK(removed_dir.error() == errc::file_in_use);
+
+  // Once the handle is closed the file can be removed
+  file.value().reset();
+  CHECK(fs.remove("/a", true).has_value());
+  CHECK_FALSE(fs.exists("/a"));
 }
